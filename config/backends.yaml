@@ -1,5 +1,10 @@
 # Composite backend pool configuration (v0.2.0).
 # If this file is absent or empty, Callosum falls back to single default_backend mode.
+#
+# Supported routing strategies (set via CALLOSUM_ROUTING_STRATEGY):
+#   - first_healthy: Always pick the first healthy backend (stable, default).
+#   - round_robin:   Cycle through healthy backends evenly.
+#   - latency_weighted: Weighted random selection favouring lower latency.
 backends:
   - name: tuck
     base_url: http://localhost:8015/v1

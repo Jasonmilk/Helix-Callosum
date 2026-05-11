@@ -57,14 +57,26 @@ class HealthMonitor:
                 continue
             try:
                 healthy, latency = await self._probe(entry.config.base_url)
-                self._pool.update_health(entry.config.name, healthy, latency)
+                self._pool.update_health(
+                    entry.config.name,
+                    healthy,
+                    latency,
+                    consecutive_failures=0,
+                    last_error="",
+                )
             except Exception as exc:
                 logger.warning(
                     "Health probe failed",
                     backend=entry.config.name,
                     error=str(exc),
                 )
-                self._pool.update_health(entry.config.name, False)
+                self._pool.update_health(
+                    entry.config.name,
+                    False,
+                    latency_ms=0.0,
+                    consecutive_failures=entry.consecutive_failures + 1,
+                    last_error=str(exc),
+                )
 
     async def _probe(self, base_url: str) -> tuple[bool, float]:
         """Perform a lightweight health check against a backend.

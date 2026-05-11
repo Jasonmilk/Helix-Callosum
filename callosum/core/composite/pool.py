@@ -29,6 +29,8 @@ class BackendState(BaseModel):
     healthy: bool = True
     last_checked: float = Field(default_factory=time.time)
     latency_ms: float = 0.0
+    consecutive_failures: int = 0
+    last_error: str = ""
 
 
 class BackendPool:
@@ -82,13 +84,27 @@ class BackendPool:
         """Return only enabled and currently healthy backends."""
         return [e for e in self._entries.values() if e.config.enabled and e.healthy]
 
-    def update_health(self, name: str, healthy: bool, latency_ms: float = 0.0) -> None:
-        """Update the health and latency of a backend after a probe."""
+    def update_health(
+        self,
+        name: str,
+        healthy: bool,
+        latency_ms: float = 0.0,
+        **extra,
+    ) -> None:
+        """Update the health and latency of a backend after a probe.
+
+        Extra keyword arguments may include:
+            consecutive_failures: int
+            last_error: str
+        """
         entry = self._entries.get(name)
         if entry is not None:
             entry.healthy = healthy
             entry.latency_ms = latency_ms
             entry.last_checked = time.time()
+            for field, value in extra.items():
+                if hasattr(entry, field):
+                    setattr(entry, field, value)
 
     @property
     def is_active(self) -> bool:

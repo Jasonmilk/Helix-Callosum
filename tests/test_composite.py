@@ -67,6 +67,27 @@ class TestBackendPool:
         assert pool.is_active is False
         assert pool.entries == []
 
+    def test_update_health_extra_fields(self, sample_pool):
+        """Extra keyword arguments should be stored on BackendState."""
+        sample_pool.update_health(
+            "backend-a",
+            False,
+            latency_ms=15.0,
+            consecutive_failures=3,
+            last_error="Connection timed out",
+        )
+        entry = sample_pool.get("backend-a")
+        assert entry.healthy is False
+        assert entry.latency_ms == 15.0
+        assert entry.consecutive_failures == 3
+        assert entry.last_error == "Connection timed out"
+
+    def test_consecutive_failures_default_zero(self, sample_pool):
+        """New entries should have zero consecutive failures."""
+        entry = sample_pool.get("backend-a")
+        assert entry.consecutive_failures == 0
+        assert entry.last_error == ""
+
 
 class TestCompositeRouter:
     """Unit tests for CompositeRouter."""
@@ -88,13 +109,46 @@ class TestCompositeRouter:
         """Router returns None when no backend is healthy."""
         sample_pool.update_health("backend-a", False)
         sample_pool.update_health("backend-b", False)
-        router = CompositeRouter(sample_pool)
+        router = CompositeRouter(sample_pool, "first_healthy")
         assert router.select() is None
 
     def test_round_robin_skips_unhealthy(self, sample_pool):
         """Round-robin skips unhealthy backends."""
         sample_pool.update_health("backend-a", False)
         router = CompositeRouter(sample_pool, "round_robin")
-        # Should always pick the only healthy one
         for _ in range(3):
             assert router.select().config.name == "backend-b"
+
+    def test_latency_weighted_favors_faster_backend(self, sample_pool):
+        """Latency-weighted routing should favor lower latency backends."""
+        sample_pool.update_health("backend-a", True, latency_ms=5.0)
+        sample_pool.update_health("backend-b", True, latency_ms=100.0)
+
+        router = CompositeRouter(sample_pool, "latency_weighted", latency_epsilon_ms=0.001)
+        counts = {"backend-a": 0, "backend-b": 0}
+        for _ in range(1000):
+            selected = router.select()
+            counts[selected.config.name] += 1
+        assert counts["backend-a"] > counts["backend-b"] * 2
+
+    def test_latency_weighted_uses_epsilon_when_latency_zero(self, sample_pool):
+        """When latency is zero, epsilon should be used to avoid division by zero."""
+        sample_pool.update_health("backend-a", True, latency_ms=0.0)
+        sample_pool.update_health("backend-b", True, latency_ms=0.0)
+
+        router = CompositeRouter(sample_pool, "latency_weighted", latency_epsilon_ms=0.001)
+        selected = router.select()
+        assert selected is not None
+
+    def test_latency_weighted_handles_all_same_latency(self, sample_pool):
+        """With equal latencies, both backends should get roughly equal traffic."""
+        sample_pool.update_health("backend-a", True, latency_ms=10.0)
+        sample_pool.update_health("backend-b", True, latency_ms=10.0)
+
+        router = CompositeRouter(sample_pool, "latency_weighted", latency_epsilon_ms=0.001)
+        counts = {"backend-a": 0, "backend-b": 0}
+        for _ in range(1000):
+            selected = router.select()
+            counts[selected.config.name] += 1
+        assert counts["backend-a"] > 300
+        assert counts["backend-b"] > 300

@@ -40,7 +40,11 @@ _use_composite = backends_pool.is_active
 
 if _use_composite:
     health_monitor = HealthMonitor(backends_pool, settings)
-    router = CompositeRouter(backends_pool, settings.routing_strategy)
+    router = CompositeRouter(
+        backends_pool,
+        settings.routing_strategy,
+        settings.latency_weight_epsilon_ms,
+    )
 else:
     health_monitor = None
     router = None
@@ -83,7 +87,8 @@ async def on_shutdown() -> None:
 async def health() -> dict:
     """Health check endpoint.
 
-    In composite mode, returns health status for every backend in the pool.
+    In composite mode, returns health status for every backend in the pool
+    including consecutive failures and last error details.
     In single-backend mode, returns health status for all registered adapters.
     """
     if _use_composite:
@@ -94,6 +99,8 @@ async def health() -> dict:
                 "latency_ms": round(entry.latency_ms, 1),
                 "base_url": entry.config.base_url,
                 "adapter": entry.config.adapter,
+                "consecutive_failures": entry.consecutive_failures,
+                "last_error": entry.last_error or None,
             }
         return {
             "status": "healthy" if backends_pool.healthy_entries() else "degraded",

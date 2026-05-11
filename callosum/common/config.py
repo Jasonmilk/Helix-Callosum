@@ -46,9 +46,13 @@ class Settings(BaseSettings):
     # Composite backend pool (v0.2.0)
     # When backends.yaml is absent or empty, Callosum falls back to single default_backend mode.
     backends_config_path: str = Field("./config/backends.yaml")
-    routing_strategy: Literal["first_healthy", "round_robin"] = Field("first_healthy")
+    routing_strategy: Literal["first_healthy", "round_robin", "latency_weighted"] = Field("first_healthy")
     health_check_interval: float = Field(30.0)
     health_check_timeout: float = Field(5.0)
+    latency_weight_epsilon_ms: float = Field(
+        0.001,
+        description="Minimum latency (ms) to prevent division by zero in weighted routing",
+    )
 
     # Logging
     log_level: str = Field("INFO")

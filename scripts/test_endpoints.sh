@@ -4,6 +4,10 @@
 # ─────────────────────────────────────────────────────────
 # Tests /health, /v1/compile, /v1/usage-stats against
 # a running Callosum gateway.
+#
+# Tolerates "degraded" health status (e.g. when Tuck is
+# unreachable) so that this suite is safe to run even
+# without a live LLM backend.
 # ─────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -24,8 +28,8 @@ check() {
     fi
 }
 
-check "Health Endpoint" \
-    'curl -s --max-time 3 '"$HOST"'/health | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"status\"]==\"healthy\""'
+check "Health Endpoint (accepts healthy or degraded)" \
+    'curl -s --max-time 3 '"$HOST"'/health | python3 -c "import json,sys; d=json.load(sys.stdin); assert d[\"status\"] in (\"healthy\",\"degraded\")"'
 
 check "Compile Endpoint (Valid)" \
     'curl -s -X POST '"$HOST"'/v1/compile -H "Content-Type: application/json" -H "X-Trace-Id: test-001" -d '\''{"blocks":[{"content":"System","volatility":{"score":0,"reason":"system_prompt"},"role":"system"}],"trace_id":"test-001"}'\'' | python3 -c "import json,sys; d=json.load(sys.stdin); assert \"prefix_hash\" in d"'
