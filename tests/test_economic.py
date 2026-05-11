@@ -1,3 +1,5 @@
+# tests/test_economic.py
+
 """Tests for Economic Profiler."""
 
 import pytest
@@ -24,7 +26,9 @@ def test_should_reorder_small_prompt(economic_profiler):
 
 
 def test_should_reorder_with_barrier(economic_profiler):
-    """Test that barrier permits reordering."""
+    """Test that barrier permits reordering regardless of savings."""
+    # Note: The barrier exemption does NOT depend on savings, so even with
+    # only ~1 token static (insufficient savings), it should still allow reorder.
     blocks = [
         PromptBlock(
             content="System",
@@ -36,6 +40,25 @@ def test_should_reorder_with_barrier(economic_profiler):
             role="user",
             volatility=VolatilityLevel(score=10, reason="user"),
             contains_barrier=True,
+        ),
+    ]
+    
+    should_reorder, savings = economic_profiler.should_reorder(blocks, 10000)
+    assert should_reorder is True
+
+
+def test_should_reorder_static_only(economic_profiler):
+    """Test that all-static blocks permit reordering regardless of savings."""
+    blocks = [
+        PromptBlock(
+            content="System",
+            role="system",
+            volatility=VolatilityLevel(score=0, reason="system"),
+        ),
+        PromptBlock(
+            content="Tool definition",
+            role="vfd",
+            volatility=VolatilityLevel(score=1, reason="tool_definition"),
         ),
     ]
     

@@ -1,3 +1,5 @@
+# callosum/core/economic/profiler.py
+
 """Economic Profiler main implementation."""
 
 import random
@@ -38,11 +40,27 @@ class EconomicProfiler:
             logger.info("Forcing reorder probe (Epsilon-Greedy exploration)")
             self._force_reorder_probe = False
             static_tokens = sum(
-                estimate_tokens(b.content) for b in blocks if b.volatility.score <= 1
+                estimate_tokens(b.content) for b in blocks if b.volatility and b.volatility.score <= 1
             )
             return True, static_tokens
 
-        # Condition 1: Skip if total tokens below dynamic threshold
+        # Condition 1: Explicit barrier permits safe reordering (regardless of savings)
+        if any(b.contains_barrier for b in blocks):
+            logger.debug("Reordering permitted: explicit barrier present")
+            static_tokens = sum(
+                estimate_tokens(b.content) for b in blocks if b.volatility and b.volatility.score <= 1
+            )
+            return True, static_tokens
+
+        # Condition 2: All blocks are system or vFD (safe to reorder, regardless of savings)
+        if all(b.role in ("system", "vfd") for b in blocks):
+            logger.debug("Reordering permitted: all blocks are static")
+            static_tokens = sum(
+                estimate_tokens(b.content) for b in blocks if b.volatility and b.volatility.score <= 1
+            )
+            return True, static_tokens
+
+        # Condition 3: Skip if total tokens below dynamic threshold
         if total_tokens < self._skip_tokens:
             logger.debug(
                 "Skipping reorder: total tokens below threshold", 
@@ -51,13 +69,13 @@ class EconomicProfiler:
             )
             return False, 0
 
-        # Condition 2: Compute estimated savings from static portion
+        # Condition 4: Compute estimated savings from static portion
         static_tokens = sum(
-            estimate_tokens(b.content) for b in blocks if b.volatility.score <= 1
+            estimate_tokens(b.content) for b in blocks if b.volatility and b.volatility.score <= 1
         )
         estimated_savings = static_tokens
 
-        # Condition 3: Savings must exceed dynamic threshold
+        # Condition 5: Savings must exceed dynamic threshold (unless barrier/static-only already matched)
         if estimated_savings < self._threshold:
             logger.debug(
                 "Skipping reorder: insufficient savings", 
@@ -66,19 +84,9 @@ class EconomicProfiler:
             )
             return False, estimated_savings
 
-        # Condition 4: Explicit barrier permits safe reordering
-        if any(b.contains_barrier for b in blocks):
-            logger.debug("Reordering permitted: explicit barrier present")
-            return True, estimated_savings
-
-        # Condition 5: All blocks are system or vFD (safe to reorder)
-        if all(b.role in ("system", "vfd") for b in blocks):
-            logger.debug("Reordering permitted: all blocks are static")
-            return True, estimated_savings
-
-        # Condition 6: User content present — conservative: do not reorder
-        logger.debug("Skipping reorder: user content present without barrier")
-        return False, estimated_savings
+        # Condition 6: User content present but savings justify the risk (rare edge case)
+        logger.debug("Reordering permitted: sufficient savings for mixed content")
+        return True, estimated_savings
 
     def update_thresholds(self, observed_hit_rate: float, observed_savings: int):
         """Bayesian self-calibration: update thresholds based on observed data.
