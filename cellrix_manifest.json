@@ -1,10 +1,8 @@
 {
-  "cells": [
-    {
-      "id": "callosum_stats",
-      "type": "dynamic",
-      "source": "http://localhost:8687/v1/usage-stats",
-      "refresh_interval_ms": 5000
-    }
-  ]
+  "bridge": {
+    "type": "python_function",
+    "module": "callosum.cellrix_bridge",
+    "function": "build_manifest"
+  },
+  "config": {}
 }
