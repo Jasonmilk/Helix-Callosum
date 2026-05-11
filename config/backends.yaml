@@ -1,0 +1,8 @@
+# Composite backend pool configuration (v0.2.0).
+# If this file is absent or empty, Callosum falls back to single default_backend mode.
+backends:
+  - name: tuck
+    base_url: http://localhost:8015/v1
+    adapter: openai
+    weight: 1.0
+    enabled: true

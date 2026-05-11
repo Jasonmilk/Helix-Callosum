@@ -148,18 +148,28 @@ sleep 1
 # ─────────────────────────────────────────────────────────
 step "5. Cellrix Manifest Validation (CIS v0.3.0)"
 
-if command -v cellrix &> /dev/null; then
-    if cellrix check 2>&1 | tee -a "$LOG_FILE"; then
-        pass "Cellrix manifest validation passed"
-    else
-        warn "Cellrix manifest validation failed — check manifest schema"
-        warn "Run 'cellrix check' manually for details"
-    fi
+# Cellrix is an optional visualization tool. Its absence or failure does NOT affect Callosum.
+# We temporarily activate Cellrix's own virtualenv to run 'cellrix check'.
+CELLRIX_VENV="/opt/Cellrix/.venv"
+if [ -f "$CELLRIX_VENV/bin/activate" ]; then
+    log "Temporarily activating Cellrix environment for validation..."
+    (
+        source "$CELLRIX_VENV/bin/activate"
+        if command -v cellrix &> /dev/null; then
+            log "Running cellrix check..."
+            if cellrix check 2>&1 | tee -a "$LOG_FILE"; then
+                pass "Cellrix manifest validation passed (cellrix check)"
+            else
+                warn "Cellrix manifest validation FAILED — review errors above. (Callosum is unaffected)"
+            fi
+        else
+            warn "cellrix command not found even in Cellrix venv — skipping"
+        fi
+    )
 else
-    warn "Cellrix CLI not found — skipping manifest validation"
-    warn "Install Cellrix: cd /opt/Cellrix && pip install -e ."
+    warn "Cellrix virtualenv not found at $CELLRIX_VENV — skipping Cellrix validation"
+    warn "To enable: cd /opt/Cellrix && python3 -m venv .venv && source .venv/bin/activate && pip install -e ."
 fi
-
 # ─────────────────────────────────────────────────────────
 # SUMMARY
 # ─────────────────────────────────────────────────────────

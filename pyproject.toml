@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "helix-callosum"
-version = "0.1.0"
+version = "0.2.0"
 description = "Helix-Callosum: Context Memory Allocator for AI Agents"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -45,6 +45,9 @@ dev = [
     "vcrpy>=6.0",
 ]
 
+
+[project.entry-points."cellrix.bridge"]
+callosum_dashboard = "callosum.cellrix_bridge:build_manifest"
 [project.scripts]
 callosum = "callosum.cli.cli:cli"
 

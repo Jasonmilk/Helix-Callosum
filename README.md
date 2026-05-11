@@ -1,4 +1,4 @@
-# Helix-Callosum v0.1.0
+# Helix-Callosum v0.2.0
 
 **Helix-Callosum** is the context memory allocator of the Helix ecosystem — a deterministic, protocol‑first prefix cache optimizer that bridges the gap between what an LLM *remembers* and what it *pays for*.
 
@@ -181,7 +181,7 @@ ruff format . --check          # Consistent formatting
 
 | Milestone | Status |
 |:---|:---|
-| **v0.1.0** — Physical skeleton, DTO contracts, config management | ✅ Complete |
+| **v0.2.0** — Physical skeleton, DTO contracts, config management | ✅ Complete |
 | **v0.1.1** — Iceberg Compiler + vFD Allocator + Economic Profiler full implementation | ✅ Complete |
 | **v0.1.2** — Shadow Radix Tree (token‑level) + icebreaker management | ✅ Complete |
 | **v0.1.3** — Multi‑backend adapters (Anthropic, OpenAI, vLLM, SGLang) | ✅ Complete |
