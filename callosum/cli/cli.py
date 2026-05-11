@@ -4,15 +4,15 @@ import typer
 from . import server
 from . import stats
 
-app = typer.Typer(
+cli = typer.Typer(
     name="callosum",
     help="Helix-Callosum: Context Memory Allocator for AI Agents",
     add_completion=False,
 )
 
 # Add subcommands
-app.add_typer(server.app, name="server", help="Server management commands")
-app.add_typer(stats.app, name="stats", help="Cache statistics commands")
+cli.add_typer(server.app, name="server", help="Server management commands")
+cli.add_typer(stats.app, name="stats", help="Cache statistics commands")
 
 
 def main():

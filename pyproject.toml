@@ -7,7 +7,7 @@ name = "helix-callosum"
 version = "0.1.0"
 description = "Helix-Callosum: Context Memory Allocator for AI Agents"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Jason Milk" }]
 keywords = ["ai", "agent", "llm", "kv-cache", "prefix-cache"]
@@ -32,6 +32,8 @@ dependencies = [
     "aiosqlite>=0.20.0",
     "tenacity>=9.0",
     "pyyaml>=6.0",
+    "typer>=0.25.0",
+    "shellingham>=1.5.0",
 ]
 
 [project.optional-dependencies]
