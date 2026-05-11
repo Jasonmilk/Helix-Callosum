@@ -20,6 +20,8 @@ Callosum solves this by treating every prompt as a layered **iceberg**:
 
 The **Iceberg Compiler** reorders blocks so that static content forms a contiguous prefix — maximising KV Cache hits without altering semantics. A **Shadow Radix Tree** predicts commercial API cache behaviour, an **Economic Profiler** decides *whether* to reorder at all, and a **vFD Allocator** manages external context with request‑boundary eviction.
 
+**New in v0.2.0:** The **Composite Router** can distribute requests across multiple backends (e.g. Tuck, Anthropic, OpenAI) using configurable strategies like first‑healthy and round‑robin, with automatic health monitoring and failover.
+
 The result: **fewer tokens billed, faster time‑to‑first‑token, zero semantic degradation.**
 
 ---
@@ -34,6 +36,7 @@ The result: **fewer tokens billed, faster time‑to‑first‑token, zero semant
 | Reordering risks semantic corruption | Economic Profiler blocks reorder unless safe (barrier, static‑only, or sufficient savings) |
 | External data opens prompt injection vectors | Dynamic delimiter padding neutralises escape attacks |
 | Multi‑backend setups multiply complexity | YAML‑declarative adapters with abstract base — one interface, any backend |
+| Single backend is a single point of failure | Composite Router pools backends, monitors health, fails over automatically |
 
 ---
 
@@ -42,7 +45,7 @@ The result: **fewer tokens billed, faster time‑to‑first‑token, zero semant
 ### Prerequisites
 
 - Python 3.11+
-- One or more LLM backends (Anthropic, OpenAI, vLLM, or SGLang)
+- One or more LLM backends (Anthropic, OpenAI, vLLM, SGLang, or Tuck proxy)
 
 ### Installation
 
@@ -80,6 +83,9 @@ The gateway listens on `http://0.0.0.0:8687` by default.
 curl http://localhost:8687/health
 ```
 
+In **single‑backend mode** (default), you get a list of registered adapters and their health.  
+In **composite mode** (when `config/backends.yaml` is present and non‑empty), you get per‑backend health status, latency, and the current routing mode.
+
 ### Compile a Prompt
 
 ```bash
@@ -103,11 +109,26 @@ Returns a `CompiledRequest` with reordered blocks, prefix hash, and estimated sa
 callosum stats show
 ```
 
-### Integration with Other Helix Components
+### Enabling Composite Backend Routing
 
-Callosum can act as a transparent caching proxy for any OpenAI‑compatible client. Just point the client's base URL to `http://localhost:8687/v1` and Callosum will compile, optionally reorder, and forward the request to the backend configured in `.env`.
+1. Edit `config/backends.yaml` and list your backends:
+```yaml
+backends:
+  - name: tuck
+    base_url: http://<tuck-host>:8015/v1
+    adapter: openai
+    weight: 1.0
+    enabled: true
+  - name: direct-anthropic
+    base_url: https://api.anthropic.com/v1
+    adapter: anthropic
+    weight: 0.5
+    enabled: true
+```
+2. Set the routing strategy via environment: `CALLOSUM_ROUTING_STRATEGY=round_robin` (default is `first_healthy`).
+3. Restart the gateway. The `/health` endpoint will now show composite mode and the health of each backend.
 
-For users of **Tuck**, set `CALLOSUM_DEFAULT_BACKEND=openai` and `CALLOSUM_OPENAI_BASE_URL=http://<tuck-host>:8015/v1` to route through your local LLM matrix.
+If `config/backends.yaml` is absent or empty, Callosum automatically falls back to the single‑backend mode defined by `CALLOSUM_DEFAULT_BACKEND`.
 
 ---
 
@@ -119,6 +140,7 @@ For users of **Tuck**, set `CALLOSUM_DEFAULT_BACKEND=openai` and `CALLOSUM_OPENA
 | **vFD Allocator** | Resolve `{@ref}` handles; maintain SQLite index; evict at boundaries | WAL‑mode SQLite + pluggable LRU/LFU/Hybrid policies |
 | **Economic Profiler** | Decide whether reordering is justified | Bayesian self‑calibration + hard clamp + Epsilon‑Greedy exploration |
 | **Shadow Radix Tree** | Predict commercial API cache hits; self‑calibrate TTL | Token‑level path‑compressed radix tree |
+| **Composite Router** | Pool multiple backends, health‑monitor, and route by strategy | YAML‑driven pool → HealthMonitor → configurable router (first‑healthy, round‑robin) |
 | **Adapters** | Abstract multi‑backend differences | YAML‑declarative loader; Anthropic, OpenAI, vLLM, SGLang |
 | **Gateway** | HTTP entry point; trace propagation; stats aggregation | FastAPI + structlog + W3C Trace Context |
 
@@ -128,7 +150,7 @@ For users of **Tuck**, set `CALLOSUM_DEFAULT_BACKEND=openai` and `CALLOSUM_OPENA
 
 | Method | Path | Description |
 |:---|:---|:---|
-| `GET` | `/health` | Adapter health status |
+| `GET` | `/health` | Adapter or backend health status (depends on mode) |
 | `POST` | `/v1/compile` | Compile a `CallosumRequest` into `CompiledRequest` |
 | `POST` | `/v1/chat/completions` | Full lifecycle: compile → decide → forward → return |
 | `GET` | `/v1/usage-stats?namespace=&model=` | Cache performance metrics, filterable |
@@ -146,13 +168,15 @@ Helix-Callosum/
 │   │   ├── vfd/          # Virtual File Descriptor allocator + indexer + policies
 │   │   ├── economic/     # Economic Profiler (Bayesian decision engine)
 │   │   ├── shadow/       # Shadow Radix Tree + tracker + icebreaker manager
+│   │   ├── composite/    # Composite backend pool + health monitor + router (v0.2.0)
 │   │   └── adapters/     # Abstract base + loader + backend implementations
 │   ├── schemas/          # Pydantic DTO contracts (single source of truth)
 │   ├── common/           # Config, logging, tracing, utilities
 │   └── cli/              # CLI entry points (server, stats)
 ├── config/
 │   ├── adapters.yaml     # Declarative adapter registration
-│   └── scoring_rules.yaml # Volatility scoring rules
+│   ├── scoring_rules.yaml # Volatility scoring rules
+│   └── backends.yaml     # Composite backend pool definition (v0.2.0)
 ├── tests/                # Unit tests (mirrors callosum/)
 ├── scripts/
 │   ├── setup.sh          # One‑click environment setup & test
@@ -170,7 +194,7 @@ Helix-Callosum/
 
 ```bash
 bash scripts/setup.sh         # All in one (pytest + gateway smoke + Cellrix check)
-pytest -v                      # 20/20 passing
+pytest -v                      # 29/29 passing
 ruff check .                   # Zero warnings
 ruff format . --check          # Consistent formatting
 ```
@@ -181,12 +205,10 @@ ruff format . --check          # Consistent formatting
 
 | Milestone | Status |
 |:---|:---|
-| **v0.2.0** — Physical skeleton, DTO contracts, config management | ✅ Complete |
-| **v0.1.1** — Iceberg Compiler + vFD Allocator + Economic Profiler full implementation | ✅ Complete |
-| **v0.1.2** — Shadow Radix Tree (token‑level) + icebreaker management | ✅ Complete |
-| **v0.1.3** — Multi‑backend adapters (Anthropic, OpenAI, vLLM, SGLang) | ✅ Complete |
-| **v0.1.4** — Gateway endpoints, tracing, usage‑stats, CI/CD | ✅ Complete |
-| **v0.2.0** — Composite backend routing + Cellrix CIS integration | Next |
+| **v0.1.0** — Physical skeleton, DTO contracts, config management | ✅ Complete |
+| **v0.1.4** — Iceberg Compiler, vFD, Economic Profiler, Shadow Tree, adapters, gateway | ✅ Complete |
+| **v0.2.0** — Composite backend routing, health monitoring, configurable strategies | ✅ Complete |
+| **v0.3.0** — FlowModus scheduler feedback loop, dynamic weight adjustment | Next |
 | **v1.0.0** — Production‑grade memory allocator | Planned |
 
 ---
