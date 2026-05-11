@@ -1,8 +1,26 @@
 {
-  "bridge": {
-    "type": "python_function",
-    "module": "callosum.cellrix_bridge",
-    "function": "build_manifest"
+  "version": "2.0",
+  "layout": {
+    "direction": "horizontal",
+    "slots": [
+      {"id": "status", "weight": 1},
+      {"id": "live", "weight": 2}
+    ]
   },
-  "config": {}
+  "cells": [
+    {
+      "id": "callosum_header",
+      "type": "static",
+      "slot": "status",
+      "content": " HELIX-CALLOSUM v0.1.0\n Context Memory Allocator\n ─────────────────────────\n Health: ● ONLINE\n Backend: Tuck/Local\n Min Savings Thr: 200 tok\n Eviction Policy: hybrid\n",
+      "priority": 100
+    },
+    {
+      "id": "event_log",
+      "type": "static",
+      "slot": "live",
+      "content": " Live Request Log\n ─────────────────\n Waiting for incoming requests...\n Run: curl -X POST .../v1/compile\n",
+      "priority": 100
+    }
+  ]
 }

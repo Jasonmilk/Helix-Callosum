@@ -11,18 +11,8 @@ Usage:
 def build_manifest(config: dict | None = None) -> dict:
     """Return a Cellrix Manifest v2.0 dict for the Callosum dashboard.
 
-    Layout:
-        ┌────────────────────────────────────────────┐
-        │  HELIX-CALLOSUM v0.1.0       ? for help     │
-        ├──────────────────────┬──────────────────────┤
-        │  Core Status          │  Live Request Log    │
-        │  Health: ● ONLINE     │  [dynamic] scrolling │
-        │  Backend: anthropic   │                      │
-        │  Threshold: 200       │                      │
-        │  Cache Hit Rate: 0.0% │                      │
-        ├──────────────────────┴──────────────────────┤
-        │  F1 Help  Tab Focus  q Quit                 │
-        └────────────────────────────────────────────┘
+    Currently provides a static snapshot because Cellrix does not yet
+    support 'http' as a source type for dynamic cells.
     """
     manifest = {
         "version": "2.0",
@@ -34,7 +24,6 @@ def build_manifest(config: dict | None = None) -> dict:
             ],
         },
         "cells": [
-            # Sidebar — realtime status (polled every 2s)
             {
                 "id": "callosum_header",
                 "type": "static",
@@ -50,20 +39,6 @@ def build_manifest(config: dict | None = None) -> dict:
                 ),
                 "priority": 100,
             },
-            {
-                "id": "callosum_stats",
-                "type": "dynamic",
-                "slot": "status",
-                "source": {
-                    "type": "http",
-                    "url": "http://localhost:8687/v1/usage-stats",
-                    "refresh_interval_ms": 2000,
-                },
-                "content_type": "json",
-                "collapseMode": "scroll",
-                "priority": 50,
-            },
-            # Main panel — live event log (dynamic)
             {
                 "id": "event_log",
                 "type": "static",
