@@ -1,0 +1,16 @@
+rules:
+  - role: "system"
+    score: 0
+    reason: "system_prompt"
+  - role: "tool"
+    score: 1
+    reason: "tool_definition"
+  - role: "vfd"
+    score: 1
+    reason: "virtual_file_descriptor"
+  - role: "user"
+    score: 10
+    reason: "dynamic_query"
+  - role: "dynamic"
+    score: 10
+    reason: "dynamic_content"

@@ -1,0 +1,21 @@
+adapters:
+  anthropic:
+    class_path: "callosum.core.adapters.anthropic.AnthropicAdapter"
+    enabled: true
+    requires_api_key: true
+    cache_ttl_claimed: 300
+  openai:
+    class_path: "callosum.core.adapters.openai.OpenAIAdapter"
+    enabled: true
+    requires_api_key: true
+    cache_ttl_claimed: 3600
+  vllm:
+    class_path: "callosum.core.adapters.vllm.VLLMAdapter"
+    enabled: true
+    requires_api_key: false
+    cache_strategy: "automatic_prefix_caching"
+  sglang:
+    class_path: "callosum.core.adapters.sglang.SGLangAdapter"
+    enabled: true
+    requires_api_key: false
+    cache_strategy: "radix_attention"
