@@ -20,7 +20,7 @@ Callosum solves this by treating every prompt as a layered **iceberg**:
 
 The **Iceberg Compiler** reorders blocks so that static content forms a contiguous prefix — maximising KV Cache hits without altering semantics. A **Shadow Radix Tree** predicts commercial API cache behaviour, an **Economic Profiler** decides *whether* to reorder at all, and a **vFD Allocator** manages external context with request‑boundary eviction.
 
-**New in v0.2.0:** The **Composite Router** can distribute requests across multiple backends (e.g. Tuck, Anthropic, OpenAI) using configurable strategies like first‑healthy and round‑robin, with automatic health monitoring and failover.
+**New in v0.2.0:** The **Composite Router** can distribute requests across multiple backends (e.g. Tuck, Anthropic, OpenAI) using configurable strategies — **first‑healthy**, **round‑robin**, and **latency‑weighted** — with automatic health monitoring and detailed failure tracking.
 
 The result: **fewer tokens billed, faster time‑to‑first‑token, zero semantic degradation.**
 
@@ -37,6 +37,7 @@ The result: **fewer tokens billed, faster time‑to‑first‑token, zero semant
 | External data opens prompt injection vectors | Dynamic delimiter padding neutralises escape attacks |
 | Multi‑backend setups multiply complexity | YAML‑declarative adapters with abstract base — one interface, any backend |
 | Single backend is a single point of failure | Composite Router pools backends, monitors health, fails over automatically |
+| Unbalanced traffic hurts latency | Latency‑weighted routing favours faster backends |
 
 ---
 
@@ -84,7 +85,7 @@ curl http://localhost:8687/health
 ```
 
 In **single‑backend mode** (default), you get a list of registered adapters and their health.  
-In **composite mode** (when `config/backends.yaml` is present and non‑empty), you get per‑backend health status, latency, and the current routing mode.
+In **composite mode** (when `config/backends.yaml` is present and non‑empty), you get per‑backend health status including latency, consecutive failures, and last error.
 
 ### Compile a Prompt
 
@@ -125,8 +126,8 @@ backends:
     weight: 0.5
     enabled: true
 ```
-2. Set the routing strategy via environment: `CALLOSUM_ROUTING_STRATEGY=round_robin` (default is `first_healthy`).
-3. Restart the gateway. The `/health` endpoint will now show composite mode and the health of each backend.
+2. Set the routing strategy via environment: `CALLOSUM_ROUTING_STRATEGY=latency_weighted` (options: `first_healthy`, `round_robin`, `latency_weighted`).  
+3. Restart the gateway. The `/health` endpoint will now show composite mode and detailed health metrics for each backend.
 
 If `config/backends.yaml` is absent or empty, Callosum automatically falls back to the single‑backend mode defined by `CALLOSUM_DEFAULT_BACKEND`.
 
@@ -140,7 +141,7 @@ If `config/backends.yaml` is absent or empty, Callosum automatically falls back 
 | **vFD Allocator** | Resolve `{@ref}` handles; maintain SQLite index; evict at boundaries | WAL‑mode SQLite + pluggable LRU/LFU/Hybrid policies |
 | **Economic Profiler** | Decide whether reordering is justified | Bayesian self‑calibration + hard clamp + Epsilon‑Greedy exploration |
 | **Shadow Radix Tree** | Predict commercial API cache hits; self‑calibrate TTL | Token‑level path‑compressed radix tree |
-| **Composite Router** | Pool multiple backends, health‑monitor, and route by strategy | YAML‑driven pool → HealthMonitor → configurable router (first‑healthy, round‑robin) |
+| **Composite Router** | Pool multiple backends, health‑monitor, and route by strategy | YAML‑driven pool → HealthMonitor → configurable router (first‑healthy, round‑robin, latency‑weighted) |
 | **Adapters** | Abstract multi‑backend differences | YAML‑declarative loader; Anthropic, OpenAI, vLLM, SGLang |
 | **Gateway** | HTTP entry point; trace propagation; stats aggregation | FastAPI + structlog + W3C Trace Context |
 
@@ -150,7 +151,7 @@ If `config/backends.yaml` is absent or empty, Callosum automatically falls back 
 
 | Method | Path | Description |
 |:---|:---|:---|
-| `GET` | `/health` | Adapter or backend health status (depends on mode) |
+| `GET` | `/health` | Adapter or backend health status (depends on mode); includes failure details in composite mode |
 | `POST` | `/v1/compile` | Compile a `CallosumRequest` into `CompiledRequest` |
 | `POST` | `/v1/chat/completions` | Full lifecycle: compile → decide → forward → return |
 | `GET` | `/v1/usage-stats?namespace=&model=` | Cache performance metrics, filterable |
@@ -180,7 +181,7 @@ Helix-Callosum/
 ├── tests/                # Unit tests (mirrors callosum/)
 ├── scripts/
 │   ├── setup.sh          # One‑click environment setup & test
-│   └── test_endpoints.sh # Automated endpoint test suite
+│   └── test_endpoints.sh # Automated endpoint test suite (tolerates degraded health)
 ├── docs/
 │   └── ENGINEERING.md    # Full engineering manual (4 rounds)
 ├── .env.example
@@ -194,7 +195,7 @@ Helix-Callosum/
 
 ```bash
 bash scripts/setup.sh         # All in one (pytest + gateway smoke + Cellrix check)
-pytest -v                      # 29/29 passing
+pytest -v                      # 34/34 passing
 ruff check .                   # Zero warnings
 ruff format . --check          # Consistent formatting
 ```
@@ -207,7 +208,7 @@ ruff format . --check          # Consistent formatting
 |:---|:---|
 | **v0.1.0** — Physical skeleton, DTO contracts, config management | ✅ Complete |
 | **v0.1.4** — Iceberg Compiler, vFD, Economic Profiler, Shadow Tree, adapters, gateway | ✅ Complete |
-| **v0.2.0** — Composite backend routing, health monitoring, configurable strategies | ✅ Complete |
+| **v0.2.0** — Composite backend routing, health monitoring, latency‑weighted strategy, enhanced observability | ✅ Complete |
 | **v0.3.0** — FlowModus scheduler feedback loop, dynamic weight adjustment | Next |
 | **v1.0.0** — Production‑grade memory allocator | Planned |
 
